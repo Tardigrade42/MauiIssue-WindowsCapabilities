@@ -1,0 +1,36 @@
+name: Windows x64 Build
+
+# This wf is based on the following tutorial:
+# Youtube: https://www.youtube.com/watch?v=8lvdLa0v8zY
+# Corresponding repo: https://github.com/jfversluis/MauiGithubActionsSample/blob/main/.github/workflows/dotnet-windows.yml
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v2
+      with:
+        dotnet-version: 6.0.x
+    - name: Install MAUI workload
+      run: dotnet workload install maui
+    - name: Decrypt PFX File
+      run: |
+         echo "${{ secrets.WINDOWS_CERT }}" > cert.pfx.asc
+         certutil -decode cert.pfx.asc cert.pfx
+    - name: Add Cert to Store
+      run: certutil -user -q -p ${{ secrets.WINDOWS_CERT_PASSWORD }} -importpfx cert.pfx NoRoot
+    - name: Build Windows x64 bit version
+      run: dotnet publish WindowsCapabilitiesIssue.App/WindowsCapabilitiesIssue.App.csproj -c Release -f:net6.0-windows10.0.19041.0 /p:RuntimeIdentifierOverride=win10-x64 /p:AppxPackageSigningEnabled=true /p:PackageCertificateThumbprint="${{ secrets.WINDOWS_CERT_THUMBPRINT }}" 
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v3.1.0
+      with:
+        path: .\**\AppPackages\**\*.*
